@@ -1,0 +1,52 @@
+name: Deploy Spring Boot to EC2
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      
+name: Checkout code
+      uses: actions/checkout@v4
+
+      
+name: Set up JDK 21
+      uses: actions/setup-java@v5
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+
+      
+name: Give Gradle permission
+      run: chmod +x gradlew
+
+      
+name: Build with Gradle
+      run: ./gradlew bootJar -x test
+
+      
+name: Set up SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+        ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      
+name: Copy JAR to EC2
+      run: |
+        ssh -i ~/.ssh/deploy_key ec2-user@${{ secrets.EC2_HOST }} 'mkdir -p /home/ec2-user/app'
+        scp -i ~/.ssh/deploy_key build/libs/*.jar ec2-user@${{ secrets.EC2_HOST }}:/home/ec2-user/app/
+
+      
+name: Start application
+      run: |
+        ssh -i ~/.ssh/deploy_key ec2-user@${{ secrets.EC2_HOST }} '
+          fuser -k 8080/tcp  true
+          pkill -x java  true
+          sleep 2
+          nohup java -jar /home/ec2-user/app/*.jar > /home/ec2-user/app/app.log 2>&1 &'
