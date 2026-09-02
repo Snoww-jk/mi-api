@@ -8,6 +8,6 @@ public class HelloController{
 
     @GetMapping("/api/hello")
     public String hello(){
-        return "Hola desde mi API desplegada automaticamente";
+        return "Hello world";
     }
 }
